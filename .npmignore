@@ -1,0 +1,41 @@
+# Source files (not needed in published package)
+src/
+tsconfig.json
+
+# Development and documentation files
+CLAUDE.md
+todo.md
+todos.json
+.github/
+
+# Development dependencies and configs
+.gitignore
+.git/
+
+# Test files
+test/
+tests/
+__tests__/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+
+# Development tools
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Cache
+.cache/
+.tmp/
+.temp/

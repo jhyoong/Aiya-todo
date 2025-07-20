@@ -1,0 +1,56 @@
+{
+  "name": "aiya-todo-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for managing TODO tasks",
+  "type": "module",
+  "main": "./build/lib/index.js",
+  "types": "./build/lib/index.d.ts",
+  "bin": {
+    "aiya-todo-mcp": "./build/server.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./build/lib/index.js",
+      "types": "./build/lib/index.d.ts"
+    },
+    "./server": {
+      "import": "./build/server.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc && chmod +x build/server.js",
+    "dev": "tsc && node build/server.js",
+    "clean": "rm -rf build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "build",
+    "build/**/*.d.ts"
+  ],
+  "keywords": [
+    "mcp",
+    "todo",
+    "task-management",
+    "model-context-protocol",
+    "server",
+    "productivity"
+  ],
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "homepage": "",
+  "bugs": {
+    "url": ""
+  },
+  "license": "MIT"
+}
