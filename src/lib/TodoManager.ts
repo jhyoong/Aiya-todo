@@ -7,6 +7,8 @@ export class TodoManager {
     nextId: 1,
   };
   private persistence: TodoPersistence;
+  private saveQueue: (() => void)[] = [];
+  private isSaving: boolean = false;
 
   constructor(persistence?: TodoPersistence) {
     this.persistence = persistence || new TodoPersistence();
@@ -23,12 +25,41 @@ export class TodoManager {
     }
   }
 
-  private async saveToFile(): Promise<void> {
+  private async processQueue(): Promise<void> {
+    if (this.isSaving || this.saveQueue.length === 0) {
+      return;
+    }
+
+    this.isSaving = true;
+    
     try {
       await this.persistence.saveTodos(this.store.todos, this.store.nextId);
+      
+      // Resolve all pending promises
+      const resolvers = [...this.saveQueue];
+      this.saveQueue = [];
+      resolvers.forEach(resolve => resolve());
     } catch (error) {
       console.error("Failed to save todos:", error);
+      // Reject all pending promises
+      const resolvers = [...this.saveQueue];
+      this.saveQueue = [];
+      resolvers.forEach(resolve => resolve());
+    } finally {
+      this.isSaving = false;
+      
+      // Process any new items that were added while saving
+      if (this.saveQueue.length > 0) {
+        setImmediate(() => this.processQueue());
+      }
     }
+  }
+
+  private async saveToFile(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      this.saveQueue.push(resolve);
+      setImmediate(() => this.processQueue());
+    });
   }
 
   async createTodo(request: CreateTodoRequest): Promise<Todo> {

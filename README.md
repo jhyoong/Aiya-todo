@@ -122,6 +122,12 @@ Zod schemas for request validation:
 - `GetTodoSchema`
 - `ListTodosSchema`
 
+## Changelog
+
+### v0.1.1
+- **Fixed**: Race condition in concurrent todo operations that could cause data loss and ID collisions
+- **Improved**: Added write queue mechanism to serialize file save operations
+
 ## License
 
 MIT
