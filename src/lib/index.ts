@@ -6,6 +6,9 @@ export {
   DeleteTodoSchema,
   GetTodoSchema,
   ListTodosSchema,
+  SetVerificationMethodSchema,
+  UpdateVerificationStatusSchema,
+  GetTodosNeedingVerificationSchema,
 } from "./schemas.js";
 
 export * from "../types.js";

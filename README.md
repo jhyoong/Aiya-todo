@@ -23,6 +23,9 @@ Or add it to your MCP client configuration. The server provides these tools:
 - `getTodo` - Get a specific todo by ID
 - `updateTodo` - Update a todo's title or completion status
 - `deleteTodo` - Delete a todo by ID
+- `setVerificationMethod` - Set verification method for a todo
+- `updateVerificationStatus` - Update verification status (pending/verified/failed)
+- `getTodosNeedingVerification` - Get todos that need verification
 
 ### As a Library
 
@@ -69,10 +72,33 @@ const manager = new TodoManager(persistence);
 await manager.initialize();
 
 // Use validation schemas
-import { CreateTodoSchema } from 'aiya-todo-mcp';
+import { 
+  CreateTodoSchema, 
+  SetVerificationMethodSchema,
+  UpdateVerificationStatusSchema 
+} from 'aiya-todo-mcp';
 
-const result = CreateTodoSchema.parse({ title: 'Valid todo' });
+const result = CreateTodoSchema.parse({ 
+  title: 'Valid todo',
+  verificationMethod: 'manual-check'
+});
 const todo = await manager.createTodo(result);
+
+// Set verification method for existing todo
+const verificationResult = SetVerificationMethodSchema.parse({
+  todoId: todo.id,
+  method: 'automated-test',
+  notes: 'Run unit tests'
+});
+await manager.setVerificationMethod(verificationResult);
+
+// Update verification status
+const statusUpdate = UpdateVerificationStatusSchema.parse({
+  todoId: todo.id,
+  status: 'verified',
+  notes: 'Tests passed successfully'
+});
+await manager.updateVerificationStatus(statusUpdate);
 ```
 
 ## API Reference
@@ -83,18 +109,34 @@ const todo = await manager.createTodo(result);
 interface Todo {
   id: string;
   title: string;
+  description?: string;
   completed: boolean;
   createdAt: Date;
+  tags?: string[];
+  groupId?: string;
+  verificationMethod?: string;
+  verificationStatus?: 'pending' | 'verified' | 'failed';
+  verificationNotes?: string;
 }
 
 interface CreateTodoRequest {
   title: string;
+  description?: string;
+  tags?: string[];
+  groupId?: string;
+  verificationMethod?: string;
 }
 
 interface UpdateTodoRequest {
   id: string;
   title?: string;
+  description?: string;
   completed?: boolean;
+  tags?: string[];
+  groupId?: string;
+  verificationMethod?: string;
+  verificationStatus?: 'pending' | 'verified' | 'failed';
+  verificationNotes?: string;
 }
 ```
 
@@ -108,6 +150,9 @@ interface UpdateTodoRequest {
 - `listTodos(request)` - List todos with filtering
 - `updateTodo(request)` - Update a todo
 - `deleteTodo(request)` - Delete a todo
+- `setVerificationMethod(request)` - Set verification method for a todo
+- `updateVerificationStatus(request)` - Update verification status
+- `getTodosNeedingVerification(request)` - Get todos that need verification
 
 #### `TodoPersistence`
 - `saveTodos(todos, nextId)` - Save todos to file
@@ -121,8 +166,18 @@ Zod schemas for request validation:
 - `DeleteTodoSchema`
 - `GetTodoSchema`
 - `ListTodosSchema`
+- `SetVerificationMethodSchema`
+- `UpdateVerificationStatusSchema`
+- `GetTodosNeedingVerificationSchema`
 
 ## Changelog
+
+### v0.2.1
+- **Added**: Verification system for todos with verification metadata
+- **Added**: New MCP tools: `setVerificationMethod`, `updateVerificationStatus`, `getTodosNeedingVerification`
+- **Enhanced**: Todo model with verification fields (method, status, notes)
+- **Added**: Extended validation schemas for verification operations
+- **Added**: Comprehensive test coverage for verification functionality
 
 ### v0.1.1
 - **Fixed**: Race condition in concurrent todo operations that could cause data loss and ID collisions
