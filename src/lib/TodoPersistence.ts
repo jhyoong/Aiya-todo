@@ -37,6 +37,13 @@ export class TodoPersistence {
           title: item.title,
           completed: item.completed,
           createdAt: new Date(item.createdAt),
+          // Handle new optional fields with backward compatibility
+          ...(item.description && { description: item.description }),
+          ...(item.tags && Array.isArray(item.tags) && { tags: item.tags }),
+          ...(item.groupId && { groupId: item.groupId }),
+          ...(item.verificationMethod && { verificationMethod: item.verificationMethod }),
+          ...(item.verificationStatus && { verificationStatus: item.verificationStatus }),
+          ...(item.verificationNotes && { verificationNotes: item.verificationNotes }),
         };
         todos.set(item.id, todo);
       });
