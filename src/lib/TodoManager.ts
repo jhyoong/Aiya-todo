@@ -1,4 +1,4 @@
-import { Todo, CreateTodoRequest, UpdateTodoRequest, DeleteTodoRequest, ListTodosRequest, TodoStore } from "../types.js";
+import { Todo, CreateTodoRequest, UpdateTodoRequest, DeleteTodoRequest, ListTodosRequest, TodoStore, SetVerificationMethodRequest, UpdateVerificationStatusRequest, GetTodosNeedingVerificationRequest } from "../types.js";
 import { TodoPersistence } from "./TodoPersistence.js";
 
 export class TodoManager {
@@ -72,6 +72,10 @@ export class TodoManager {
       title: request.title.trim(),
       completed: false,
       createdAt: new Date(),
+      ...(request.description && { description: request.description }),
+      ...(request.tags && { tags: request.tags }),
+      ...(request.groupId && { groupId: request.groupId }),
+      ...(request.verificationMethod && { verificationMethod: request.verificationMethod }),
     };
 
     this.store.todos.set(todo.id, todo);
@@ -108,7 +112,13 @@ export class TodoManager {
     const updatedTodo: Todo = {
       ...existingTodo,
       ...(request.title !== undefined && { title: request.title.trim() }),
+      ...(request.description !== undefined && { description: request.description }),
       ...(request.completed !== undefined && { completed: request.completed }),
+      ...(request.tags !== undefined && { tags: request.tags }),
+      ...(request.groupId !== undefined && { groupId: request.groupId }),
+      ...(request.verificationMethod !== undefined && { verificationMethod: request.verificationMethod }),
+      ...(request.verificationStatus !== undefined && { verificationStatus: request.verificationStatus }),
+      ...(request.verificationNotes !== undefined && { verificationNotes: request.verificationNotes }),
     };
 
     if (request.title !== undefined && request.title.trim().length === 0) {
@@ -129,5 +139,54 @@ export class TodoManager {
     const result = this.store.todos.delete(request.id);
     await this.saveToFile();
     return result;
+  }
+
+  async setVerificationMethod(request: SetVerificationMethodRequest): Promise<Todo> {
+    const existingTodo = this.store.todos.get(request.todoId);
+    if (!existingTodo) {
+      throw new Error(`Todo with ID ${request.todoId} not found`);
+    }
+
+    const updatedTodo: Todo = {
+      ...existingTodo,
+      verificationMethod: request.method,
+      verificationStatus: 'pending',
+      ...(request.notes && { verificationNotes: request.notes }),
+    };
+
+    this.store.todos.set(request.todoId, updatedTodo);
+    await this.saveToFile();
+    return updatedTodo;
+  }
+
+  async updateVerificationStatus(request: UpdateVerificationStatusRequest): Promise<Todo> {
+    const existingTodo = this.store.todos.get(request.todoId);
+    if (!existingTodo) {
+      throw new Error(`Todo with ID ${request.todoId} not found`);
+    }
+
+    const updatedTodo: Todo = {
+      ...existingTodo,
+      verificationStatus: request.status,
+      ...(request.notes !== undefined && { verificationNotes: request.notes }),
+    };
+
+    this.store.todos.set(request.todoId, updatedTodo);
+    await this.saveToFile();
+    return updatedTodo;
+  }
+
+  getTodosNeedingVerification(request: GetTodosNeedingVerificationRequest): Todo[] {
+    const todos = Array.from(this.store.todos.values());
+    
+    const needingVerification = todos.filter(todo => {
+      const hasVerificationMethod = todo.verificationMethod !== undefined;
+      const isPending = todo.verificationStatus === 'pending' || todo.verificationStatus === undefined;
+      const matchesGroup = request.groupId === undefined || todo.groupId === request.groupId;
+      
+      return hasVerificationMethod && isPending && matchesGroup;
+    });
+    
+    return needingVerification;
   }
 }

@@ -15,8 +15,11 @@ import {
   DeleteTodoSchema,
   GetTodoSchema,
   ListTodosSchema,
+  SetVerificationMethodSchema,
+  UpdateVerificationStatusSchema,
+  GetTodosNeedingVerificationSchema,
 } from "./lib/schemas.js";
-import { UpdateTodoRequest, ListTodosRequest } from "./types.js";
+import { UpdateTodoRequest, ListTodosRequest, SetVerificationMethodRequest, UpdateVerificationStatusRequest, GetTodosNeedingVerificationRequest } from "./types.js";
 
 const todoManager = new TodoManager();
 
@@ -24,7 +27,7 @@ const todoManager = new TodoManager();
 const server = new Server(
   {
     name: "aiya-todo-mcp",
-    version: "0.1.0",
+    version: "0.2.0",
   },
   {
     capabilities: {
@@ -39,7 +42,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "createTodo",
-        description: "Create a new todo item",
+        description: "Create a new todo item with optional verification settings",
         inputSchema: {
           type: "object",
           properties: {
@@ -47,6 +50,23 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description: "The title of the todo item",
               minLength: 1,
+            },
+            description: {
+              type: "string",
+              description: "Optional detailed description of the todo item",
+            },
+            tags: {
+              type: "array",
+              items: { type: "string" },
+              description: "Optional array of tags for categorization",
+            },
+            groupId: {
+              type: "string",
+              description: "Optional group ID for organizing related todos",
+            },
+            verificationMethod: {
+              type: "string",
+              description: "Optional method for verifying task completion",
             },
           },
           required: ["title"],
@@ -82,7 +102,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "updateTodo",
-        description: "Update a todo item's title or completion status",
+        description: "Update a todo item's properties including verification settings",
         inputSchema: {
           type: "object",
           properties: {
@@ -96,9 +116,35 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: "New title for the todo item (optional)",
               minLength: 1,
             },
+            description: {
+              type: "string",
+              description: "New description for the todo item (optional)",
+            },
             completed: {
               type: "boolean",
               description: "New completion status (optional)",
+            },
+            tags: {
+              type: "array",
+              items: { type: "string" },
+              description: "New tags array (optional)",
+            },
+            groupId: {
+              type: "string",
+              description: "New group ID (optional)",
+            },
+            verificationMethod: {
+              type: "string",
+              description: "New verification method (optional)",
+            },
+            verificationStatus: {
+              type: "string",
+              enum: ["pending", "verified", "failed"],
+              description: "New verification status (optional)",
+            },
+            verificationNotes: {
+              type: "string",
+              description: "New verification notes (optional)",
             },
           },
           required: ["id"],
@@ -119,6 +165,67 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["id"],
         },
       },
+      {
+        name: "setVerificationMethod",
+        description: "Set how a todo should be verified by the LLM",
+        inputSchema: {
+          type: "object",
+          properties: {
+            todoId: {
+              type: "string",
+              description: "The ID of the todo item",
+              minLength: 1,
+            },
+            method: {
+              type: "string",
+              description: "How the todo should be verified (LLM decides this)",
+              minLength: 1,
+            },
+            notes: {
+              type: "string",
+              description: "Optional notes about the verification method",
+            },
+          },
+          required: ["todoId", "method"],
+        },
+      },
+      {
+        name: "updateVerificationStatus",
+        description: "Update the verification status of a todo",
+        inputSchema: {
+          type: "object",
+          properties: {
+            todoId: {
+              type: "string",
+              description: "The ID of the todo item",
+              minLength: 1,
+            },
+            status: {
+              type: "string",
+              enum: ["pending", "verified", "failed"],
+              description: "The verification status",
+            },
+            notes: {
+              type: "string",
+              description: "Optional notes about the verification result",
+            },
+          },
+          required: ["todoId", "status"],
+        },
+      },
+      {
+        name: "getTodosNeedingVerification",
+        description: "List all todos that need verification",
+        inputSchema: {
+          type: "object",
+          properties: {
+            groupId: {
+              type: "string",
+              description: "Optional group ID to filter by",
+            },
+          },
+        },
+      },
     ],
   };
 });
@@ -130,7 +237,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case "createTodo": {
         const validatedArgs = CreateTodoSchema.parse(args);
-        const todo = await todoManager.createTodo(validatedArgs);
+        const todo = await todoManager.createTodo(validatedArgs as any);
         
         return {
           content: [
@@ -199,6 +306,50 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: "text",
               text: `Todo with ID ${validatedArgs.id} deleted successfully`,
+            },
+          ],
+        };
+      }
+
+      case "setVerificationMethod": {
+        const validatedArgs = SetVerificationMethodSchema.parse(args);
+        const todo = await todoManager.setVerificationMethod(validatedArgs as SetVerificationMethodRequest);
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Verification method set for todo "${todo.title}" (ID: ${todo.id})\nMethod: ${todo.verificationMethod}\nStatus: ${todo.verificationStatus}${todo.verificationNotes ? `\nNotes: ${todo.verificationNotes}` : ''}`,
+            },
+          ],
+        };
+      }
+
+      case "updateVerificationStatus": {
+        const validatedArgs = UpdateVerificationStatusSchema.parse(args);
+        const todo = await todoManager.updateVerificationStatus(validatedArgs as UpdateVerificationStatusRequest);
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Verification status updated for todo "${todo.title}" (ID: ${todo.id})\nStatus: ${todo.verificationStatus}${todo.verificationNotes ? `\nNotes: ${todo.verificationNotes}` : ''}`,
+            },
+          ],
+        };
+      }
+
+      case "getTodosNeedingVerification": {
+        const validatedArgs = GetTodosNeedingVerificationSchema.parse(args);
+        const todos = todoManager.getTodosNeedingVerification(validatedArgs as GetTodosNeedingVerificationRequest);
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Found ${todos.length} todos needing verification:\n${todos.map(todo => 
+                `${todo.id}: ${todo.title}\n  Method: ${todo.verificationMethod}\n  Status: ${todo.verificationStatus || 'pending'}${todo.verificationNotes ? `\n  Notes: ${todo.verificationNotes}` : ''}`
+              ).join('\n\n')}`,
             },
           ],
         };
