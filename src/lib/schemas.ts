@@ -6,6 +6,18 @@ export const CreateTodoSchema = z.object({
   tags: z.array(z.string()).optional(),
   groupId: z.string().optional(),
   verificationMethod: z.string().optional(),
+  dependencies: z.array(z.string()).optional(),
+  executionOrder: z.number().optional(),
+  executionConfig: z.object({
+    toolsRequired: z.array(z.string()).optional(),
+    params: z.record(z.any()).optional(),
+    retryOnFailure: z.boolean().optional(),
+  }).optional(),
+  executionStatus: z.object({
+    state: z.enum(['pending', 'ready', 'running', 'completed', 'failed']),
+    lastError: z.string().optional(),
+    attempts: z.number().optional(),
+  }).optional(),
 });
 
 export const UpdateTodoSchema = z.object({
@@ -18,6 +30,18 @@ export const UpdateTodoSchema = z.object({
   verificationMethod: z.string().optional(),
   verificationStatus: z.enum(['pending', 'verified', 'failed']).optional(),
   verificationNotes: z.string().optional(),
+  dependencies: z.array(z.string()).optional(),
+  executionOrder: z.number().optional(),
+  executionConfig: z.object({
+    toolsRequired: z.array(z.string()).optional(),
+    params: z.record(z.any()).optional(),
+    retryOnFailure: z.boolean().optional(),
+  }).optional(),
+  executionStatus: z.object({
+    state: z.enum(['pending', 'ready', 'running', 'completed', 'failed']),
+    lastError: z.string().optional(),
+    attempts: z.number().optional(),
+  }).optional(),
 }).refine(
   (data) => Object.keys(data).some(key => key !== 'id' && data[key as keyof typeof data] !== undefined),
   { message: "At least one field must be provided for update" }

@@ -9,6 +9,18 @@ export interface Todo {
   verificationMethod?: string;
   verificationStatus?: 'pending' | 'verified' | 'failed';
   verificationNotes?: string;
+  dependencies?: string[];
+  executionOrder?: number;
+  executionConfig?: {
+    toolsRequired?: string[];
+    params?: Record<string, any>;
+    retryOnFailure?: boolean;
+  };
+  executionStatus?: {
+    state: 'pending' | 'ready' | 'running' | 'completed' | 'failed';
+    lastError?: string;
+    attempts?: number;
+  };
 }
 
 export interface CreateTodoRequest {
@@ -17,6 +29,18 @@ export interface CreateTodoRequest {
   tags?: string[];
   groupId?: string;
   verificationMethod?: string;
+  dependencies?: string[];
+  executionOrder?: number;
+  executionConfig?: {
+    toolsRequired?: string[];
+    params?: Record<string, any>;
+    retryOnFailure?: boolean;
+  };
+  executionStatus?: {
+    state: 'pending' | 'ready' | 'running' | 'completed' | 'failed';
+    lastError?: string;
+    attempts?: number;
+  };
 }
 
 export interface UpdateTodoRequest {
@@ -29,6 +53,18 @@ export interface UpdateTodoRequest {
   verificationMethod?: string;
   verificationStatus?: 'pending' | 'verified' | 'failed';
   verificationNotes?: string;
+  dependencies?: string[];
+  executionOrder?: number;
+  executionConfig?: {
+    toolsRequired?: string[];
+    params?: Record<string, any>;
+    retryOnFailure?: boolean;
+  };
+  executionStatus?: {
+    state: 'pending' | 'ready' | 'running' | 'completed' | 'failed';
+    lastError?: string;
+    attempts?: number;
+  };
 }
 
 export interface DeleteTodoRequest {

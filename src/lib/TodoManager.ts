@@ -76,6 +76,10 @@ export class TodoManager {
       ...(request.tags && { tags: request.tags }),
       ...(request.groupId && { groupId: request.groupId }),
       ...(request.verificationMethod && { verificationMethod: request.verificationMethod }),
+      ...(request.dependencies && { dependencies: request.dependencies }),
+      ...(request.executionOrder !== undefined && { executionOrder: request.executionOrder }),
+      ...(request.executionConfig && { executionConfig: request.executionConfig }),
+      ...(request.executionStatus && { executionStatus: request.executionStatus }),
     };
 
     this.store.todos.set(todo.id, todo);
@@ -119,6 +123,10 @@ export class TodoManager {
       ...(request.verificationMethod !== undefined && { verificationMethod: request.verificationMethod }),
       ...(request.verificationStatus !== undefined && { verificationStatus: request.verificationStatus }),
       ...(request.verificationNotes !== undefined && { verificationNotes: request.verificationNotes }),
+      ...(request.dependencies !== undefined && { dependencies: request.dependencies }),
+      ...(request.executionOrder !== undefined && { executionOrder: request.executionOrder }),
+      ...(request.executionConfig !== undefined && { executionConfig: request.executionConfig }),
+      ...(request.executionStatus !== undefined && { executionStatus: request.executionStatus }),
     };
 
     if (request.title !== undefined && request.title.trim().length === 0) {

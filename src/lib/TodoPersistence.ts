@@ -44,6 +44,10 @@ export class TodoPersistence {
           ...(item.verificationMethod && { verificationMethod: item.verificationMethod }),
           ...(item.verificationStatus && { verificationStatus: item.verificationStatus }),
           ...(item.verificationNotes && { verificationNotes: item.verificationNotes }),
+          ...(item.dependencies && Array.isArray(item.dependencies) && { dependencies: item.dependencies }),
+          ...(item.executionOrder !== undefined && { executionOrder: item.executionOrder }),
+          ...(item.executionConfig && { executionConfig: item.executionConfig }),
+          ...(item.executionStatus && { executionStatus: item.executionStatus }),
         };
         todos.set(item.id, todo);
       });
