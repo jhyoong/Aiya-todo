@@ -9,6 +9,7 @@ import {
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { TodoManager } from "./lib/TodoManager.js";
+import { ExecutionStateManager } from "./utils/ExecutionStateManager.js";
 import {
   CreateTodoSchema,
   UpdateTodoSchema,
@@ -18,16 +19,20 @@ import {
   SetVerificationMethodSchema,
   UpdateVerificationStatusSchema,
   GetTodosNeedingVerificationSchema,
+  CreateTaskGroupSchema,
+  GetExecutableTasksSchema,
+  UpdateExecutionStatusSchema,
 } from "./lib/schemas.js";
-import { UpdateTodoRequest, ListTodosRequest, SetVerificationMethodRequest, UpdateVerificationStatusRequest, GetTodosNeedingVerificationRequest } from "./types.js";
+import { UpdateTodoRequest, ListTodosRequest, SetVerificationMethodRequest, UpdateVerificationStatusRequest, GetTodosNeedingVerificationRequest, CreateTaskGroupRequest, GetExecutableTasksRequest, UpdateExecutionStatusRequest } from "./types.js";
 
 const todoManager = new TodoManager();
+const executionStateManager = new ExecutionStateManager();
 
 
 const server = new Server(
   {
     name: "aiya-todo-mcp",
-    version: "0.2.1",
+    version: "0.3.0",
   },
   {
     capabilities: {
@@ -226,6 +231,66 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
         },
       },
+      {
+        name: "createTaskGroup",
+        description: "Create a group of related tasks for agentic execution",
+        inputSchema: {
+          type: "object",
+          properties: {
+            mainTask: {
+              type: "object",
+              properties: {
+                title: { type: "string" },
+                description: { type: "string" },
+                tags: { type: "array", items: { type: "string" } }
+              },
+              required: ["title"]
+            },
+            subtasks: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  dependencies: { type: "array", items: { type: "integer" } },
+                  executionConfig: { type: "object" }
+                },
+                required: ["title"]
+              }
+            },
+            groupId: { type: "string" }
+          },
+          required: ["mainTask", "subtasks"]
+        }
+      },
+      {
+        name: "getExecutableTasks",
+        description: "Get tasks ready for execution (dependencies satisfied)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            groupId: { type: "string" },
+            limit: { type: "integer", minimum: 1 }
+          }
+        }
+      },
+      {
+        name: "updateExecutionStatus",
+        description: "Update the execution state of a task",
+        inputSchema: {
+          type: "object",
+          properties: {
+            todoId: { type: "string" },
+            state: { 
+              type: "string",
+              enum: ["pending", "ready", "running", "completed", "failed"]
+            },
+            error: { type: "string" }
+          },
+          required: ["todoId", "state"]
+        }
+      },
     ],
   };
 });
@@ -350,6 +415,165 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: `Found ${todos.length} todos needing verification:\n${todos.map(todo => 
                 `${todo.id}: ${todo.title}\n  Method: ${todo.verificationMethod}\n  Status: ${todo.verificationStatus || 'pending'}${todo.verificationNotes ? `\n  Notes: ${todo.verificationNotes}` : ''}`
               ).join('\n\n')}`,
+            },
+          ],
+        };
+      }
+
+      case "createTaskGroup": {
+        const validatedArgs = CreateTaskGroupSchema.parse(args);
+        const request = validatedArgs as CreateTaskGroupRequest;
+        
+        // Generate groupId if not provided
+        const groupId = request.groupId || `group-${Date.now()}`;
+        
+        const createdTasks: string[] = [];
+        
+        try {
+          // Create main task first (executionOrder: 0)
+          const mainTodo = await todoManager.createTodo({
+            title: request.mainTask.title,
+            ...(request.mainTask.description && { description: request.mainTask.description }),
+            ...(request.mainTask.tags && { tags: request.mainTask.tags }),
+            groupId: groupId,
+            executionOrder: 0,
+            executionStatus: { state: 'pending' }
+          });
+          createdTasks.push(mainTodo.id);
+          
+          // Create subtasks with proper dependencies
+          const subtaskIds: string[] = [];
+          for (let i = 0; i < request.subtasks.length; i++) {
+            const subtask = request.subtasks[i];
+            
+            // Convert array indices to actual todo IDs for dependencies
+            const dependencies = subtask.dependencies?.map(index => {
+              if (index === 0) return mainTodo.id; // 0 refers to main task
+              if (index <= i) return subtaskIds[index - 1]; // 1+ refers to previous subtasks
+              throw new Error(`Invalid dependency index ${index} for subtask ${i + 1}`);
+            });
+            
+            const subtaskTodo = await todoManager.createTodo({
+              title: subtask.title,
+              ...(subtask.description && { description: subtask.description }),
+              ...(dependencies && { dependencies }),
+              executionOrder: i + 1,
+              ...(subtask.executionConfig && { executionConfig: subtask.executionConfig }),
+              groupId: groupId,
+              executionStatus: { state: 'pending' }
+            });
+            
+            createdTasks.push(subtaskTodo.id);
+            subtaskIds.push(subtaskTodo.id);
+          }
+          
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Task group created successfully!\nGroup ID: ${groupId}\nMain Task: ${mainTodo.title} (ID: ${mainTodo.id})\nSubtasks: ${subtaskIds.length}\nTotal Tasks Created: ${createdTasks.length}`,
+              },
+            ],
+          };
+          
+        } catch (error) {
+          // Rollback: delete any created tasks
+          for (const taskId of createdTasks) {
+            try {
+              await todoManager.deleteTodo({ id: taskId });
+            } catch (deleteError) {
+              console.error(`Failed to rollback task ${taskId}:`, deleteError);
+            }
+          }
+          throw error;
+        }
+      }
+
+      case "getExecutableTasks": {
+        const validatedArgs = GetExecutableTasksSchema.parse(args);
+        const request = validatedArgs as GetExecutableTasksRequest;
+        
+        let readyTasks = todoManager.getReadyTasks(request.groupId);
+        
+        // Sort by executionOrder for consistent results
+        readyTasks.sort((a, b) => (a.executionOrder || 0) - (b.executionOrder || 0));
+        
+        // Apply limit if provided
+        if (request.limit && request.limit > 0) {
+          readyTasks = readyTasks.slice(0, request.limit);
+        }
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Found ${readyTasks.length} executable tasks:\n${readyTasks.map(todo => 
+                `[${todo.executionOrder || 0}] ${todo.id}: ${todo.title}${todo.groupId ? ` (Group: ${todo.groupId})` : ''}${todo.dependencies && todo.dependencies.length > 0 ? `\n  Dependencies: ${todo.dependencies.join(', ')}` : ''}`
+              ).join('\n\n')}`,
+            },
+          ],
+        };
+      }
+
+      case "updateExecutionStatus": {
+        const validatedArgs = UpdateExecutionStatusSchema.parse(args);
+        const request = validatedArgs as UpdateExecutionStatusRequest;
+        
+        const existingTodo = todoManager.getTodo(request.todoId);
+        if (!existingTodo) {
+          throw new Error(`Todo with ID ${request.todoId} not found`);
+        }
+        
+        // Use ExecutionStateManager to handle state transition
+        const transitionRequest: any = {
+          todoId: request.todoId,
+          newState: request.state,
+        };
+        if (request.error !== undefined) {
+          transitionRequest.error = request.error;
+        }
+
+        const result = await executionStateManager.updateExecutionStatus(
+          existingTodo,
+          transitionRequest,
+          async (todoId, updates) => {
+            return await todoManager.updateTodo({
+              id: todoId,
+              ...updates,
+            });
+          }
+        );
+        
+        if (!result.success) {
+          throw new Error(result.message);
+        }
+        
+        // Check if main task should be auto-completed (when subtask completes)
+        let mainTaskResult = { mainTaskCompleted: false };
+        if (existingTodo.groupId && request.state === 'completed') {
+          mainTaskResult = await executionStateManager.checkAndCompleteMainTask(
+            existingTodo.groupId,
+            () => todoManager.getAllTodos(),
+            async (todoId, updates) => {
+              return await todoManager.updateTodo({
+                id: todoId,
+                ...updates,
+              });
+            }
+          );
+        }
+        
+        let responseText = result.message;
+        if (mainTaskResult.mainTaskCompleted && (mainTaskResult as any).mainTask) {
+          const mainTask = (mainTaskResult as any).mainTask;
+          responseText += `\n\nMain task "${mainTask.title}" has been automatically completed as all subtasks are finished.`;
+        }
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: responseText,
             },
           ],
         };

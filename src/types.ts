@@ -95,6 +95,36 @@ export interface GetTodosNeedingVerificationRequest {
   groupId?: string;
 }
 
+export interface CreateTaskGroupRequest {
+  mainTask: {
+    title: string;
+    description?: string;
+    tags?: string[];
+  };
+  subtasks: {
+    title: string;
+    description?: string;
+    dependencies?: number[];
+    executionConfig?: {
+      toolsRequired?: string[];
+      params?: Record<string, any>;
+      retryOnFailure?: boolean;
+    };
+  }[];
+  groupId?: string;
+}
+
+export interface GetExecutableTasksRequest {
+  groupId?: string;
+  limit?: number;
+}
+
+export interface UpdateExecutionStatusRequest {
+  todoId: string;
+  state: 'pending' | 'ready' | 'running' | 'completed' | 'failed';
+  error?: string;
+}
+
 export interface TodoStore {
   todos: Map<string, Todo>;
   nextId: number;
