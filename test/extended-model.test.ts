@@ -74,9 +74,13 @@ describe('Extended Todo Model', () => {
     });
 
     it('should create todo with all new fields', async () => {
+      // Create dependency todos first
+      const dep1 = await todoManager.createTodo({ title: 'Dependency 1' });
+      const dep2 = await todoManager.createTodo({ title: 'Dependency 2' });
+
       const request = {
         title: 'Complex task',
-        dependencies: ['1', '2'],
+        dependencies: [dep1.id, dep2.id],
         executionOrder: 5,
         executionConfig: {
           toolsRequired: ['git', 'npm'],
@@ -92,7 +96,7 @@ describe('Extended Todo Model', () => {
 
       const todo = await todoManager.createTodo(request);
 
-      expect(todo.dependencies).toEqual(['1', '2']);
+      expect(todo.dependencies).toEqual([dep1.id, dep2.id]);
       expect(todo.executionOrder).toBe(5);
       expect(todo.executionConfig?.toolsRequired).toEqual(['git', 'npm']);
       expect(todo.executionConfig?.params).toEqual({ branch: 'main' });
@@ -156,24 +160,32 @@ describe('Extended Todo Model', () => {
     });
 
     it('should update dependencies and execution order', async () => {
+      // Create dependency todos first
+      const dep1 = await todoManager.createTodo({ title: 'Dependency 1' });
+      const dep2 = await todoManager.createTodo({ title: 'Dependency 2' });
+      const dep3 = await todoManager.createTodo({ title: 'Dependency 3' });
+
       const updateRequest = {
         id: todoId,
-        dependencies: ['dep1', 'dep2', 'dep3'],
+        dependencies: [dep1.id, dep2.id, dep3.id],
         executionOrder: 10
       };
 
       const updatedTodo = await todoManager.updateTodo(updateRequest);
 
-      expect(updatedTodo.dependencies).toEqual(['dep1', 'dep2', 'dep3']);
+      expect(updatedTodo.dependencies).toEqual([dep1.id, dep2.id, dep3.id]);
       expect(updatedTodo.executionOrder).toBe(10);
     });
   });
 
   describe('Persistence and Loading', () => {
     it('should persist and load new fields correctly', async () => {
+      // Create dependency todo first
+      const dep1 = await todoManager.createTodo({ title: 'Dependency 1' });
+
       const originalTodo = await todoManager.createTodo({
         title: 'Persistent task',
-        dependencies: ['dep1'],
+        dependencies: [dep1.id],
         executionOrder: 3,
         executionConfig: {
           toolsRequired: ['webpack'],
@@ -193,7 +205,7 @@ describe('Extended Todo Model', () => {
 
       const loadedTodo = newManager.getTodo(originalTodo.id);
 
-      expect(loadedTodo?.dependencies).toEqual(['dep1']);
+      expect(loadedTodo?.dependencies).toEqual([dep1.id]);
       expect(loadedTodo?.executionOrder).toBe(3);
       expect(loadedTodo?.executionConfig?.toolsRequired).toEqual(['webpack']);
       expect(loadedTodo?.executionConfig?.params).toEqual({ mode: 'production' });
@@ -338,13 +350,16 @@ describe('Extended Todo Model', () => {
 
   describe('Mixed Field Operations', () => {
     it('should handle todos with both old and new fields', async () => {
+      // Create dependency todo first
+      const dep1 = await todoManager.createTodo({ title: 'Dependency 1' });
+
       const todo = await todoManager.createTodo({
         title: 'Mixed field task',
         description: 'Task with both old and new fields',
         tags: ['mixed', 'test'],
         groupId: 'mixed-group',
         verificationMethod: 'Check output',
-        dependencies: ['dep1'],
+        dependencies: [dep1.id],
         executionOrder: 2,
         executionConfig: {
           toolsRequired: ['node'],
@@ -359,7 +374,7 @@ describe('Extended Todo Model', () => {
       expect(todo.verificationMethod).toBe('Check output');
 
       // New fields
-      expect(todo.dependencies).toEqual(['dep1']);
+      expect(todo.dependencies).toEqual([dep1.id]);
       expect(todo.executionOrder).toBe(2);
       expect(todo.executionConfig?.toolsRequired).toEqual(['node']);
       expect(todo.executionConfig?.retryOnFailure).toBe(true);

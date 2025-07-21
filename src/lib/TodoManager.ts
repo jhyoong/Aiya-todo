@@ -1,5 +1,6 @@
 import { Todo, CreateTodoRequest, UpdateTodoRequest, DeleteTodoRequest, ListTodosRequest, TodoStore, SetVerificationMethodRequest, UpdateVerificationStatusRequest, GetTodosNeedingVerificationRequest } from "../types.js";
 import { TodoPersistence } from "./TodoPersistence.js";
+import { DependencyResolver } from "../utils/DependencyResolver.js";
 
 export class TodoManager {
   private store: TodoStore = {
@@ -7,11 +8,13 @@ export class TodoManager {
     nextId: 1,
   };
   private persistence: TodoPersistence;
+  private dependencyResolver: DependencyResolver;
   private saveQueue: (() => void)[] = [];
   private isSaving: boolean = false;
 
   constructor(persistence?: TodoPersistence) {
     this.persistence = persistence || new TodoPersistence();
+    this.dependencyResolver = new DependencyResolver();
   }
 
   async initialize(): Promise<void> {
@@ -67,6 +70,16 @@ export class TodoManager {
       throw new Error("Todo title cannot be empty");
     }
 
+    // Validate dependencies if provided
+    if (request.dependencies && request.dependencies.length > 0) {
+      const allTodos = this.getAllTodos();
+      this.dependencyResolver.validateDependencies(
+        this.store.nextId.toString(),
+        request.dependencies,
+        allTodos
+      );
+    }
+
     const todo: Todo = {
       id: this.store.nextId.toString(),
       title: request.title.trim(),
@@ -113,6 +126,20 @@ export class TodoManager {
       throw new Error(`Todo with ID ${request.id} not found`);
     }
 
+    if (request.title !== undefined && request.title.trim().length === 0) {
+      throw new Error("Todo title cannot be empty");
+    }
+
+    // Validate dependencies if they are being updated
+    if (request.dependencies !== undefined && request.dependencies.length > 0) {
+      const allTodos = this.getAllTodos();
+      this.dependencyResolver.validateDependencies(
+        request.id,
+        request.dependencies,
+        allTodos
+      );
+    }
+
     const updatedTodo: Todo = {
       ...existingTodo,
       ...(request.title !== undefined && { title: request.title.trim() }),
@@ -128,10 +155,6 @@ export class TodoManager {
       ...(request.executionConfig !== undefined && { executionConfig: request.executionConfig }),
       ...(request.executionStatus !== undefined && { executionStatus: request.executionStatus }),
     };
-
-    if (request.title !== undefined && request.title.trim().length === 0) {
-      throw new Error("Todo title cannot be empty");
-    }
 
     this.store.todos.set(request.id, updatedTodo);
     await this.saveToFile();
@@ -196,5 +219,16 @@ export class TodoManager {
     });
     
     return needingVerification;
+  }
+
+  getReadyTasks(groupId?: string): Todo[] {
+    const allTodos = this.getAllTodos();
+    const readyTasks = this.dependencyResolver.getReadyTasks(allTodos);
+    
+    if (groupId !== undefined) {
+      return readyTasks.filter(todo => todo.groupId === groupId);
+    }
+    
+    return readyTasks;
   }
 }

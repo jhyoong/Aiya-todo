@@ -1,5 +1,6 @@
 export { TodoManager } from "./TodoManager.js";
 export { TodoPersistence } from "./TodoPersistence.js";
+export { DependencyResolver } from "../utils/DependencyResolver.js";
 export {
   CreateTodoSchema,
   UpdateTodoSchema,
