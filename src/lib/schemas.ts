@@ -6,6 +6,18 @@ export const CreateTodoSchema = z.object({
   tags: z.array(z.string()).optional(),
   groupId: z.string().optional(),
   verificationMethod: z.string().optional(),
+  dependencies: z.array(z.string()).optional(),
+  executionOrder: z.number().optional(),
+  executionConfig: z.object({
+    toolsRequired: z.array(z.string()).optional(),
+    params: z.record(z.any()).optional(),
+    retryOnFailure: z.boolean().optional(),
+  }).optional(),
+  executionStatus: z.object({
+    state: z.enum(['pending', 'ready', 'running', 'completed', 'failed']),
+    lastError: z.string().optional(),
+    attempts: z.number().optional(),
+  }).optional(),
 });
 
 export const UpdateTodoSchema = z.object({
@@ -18,6 +30,18 @@ export const UpdateTodoSchema = z.object({
   verificationMethod: z.string().optional(),
   verificationStatus: z.enum(['pending', 'verified', 'failed']).optional(),
   verificationNotes: z.string().optional(),
+  dependencies: z.array(z.string()).optional(),
+  executionOrder: z.number().optional(),
+  executionConfig: z.object({
+    toolsRequired: z.array(z.string()).optional(),
+    params: z.record(z.any()).optional(),
+    retryOnFailure: z.boolean().optional(),
+  }).optional(),
+  executionStatus: z.object({
+    state: z.enum(['pending', 'ready', 'running', 'completed', 'failed']),
+    lastError: z.string().optional(),
+    attempts: z.number().optional(),
+  }).optional(),
 }).refine(
   (data) => Object.keys(data).some(key => key !== 'id' && data[key as keyof typeof data] !== undefined),
   { message: "At least one field must be provided for update" }
@@ -49,4 +73,34 @@ export const UpdateVerificationStatusSchema = z.object({
 
 export const GetTodosNeedingVerificationSchema = z.object({
   groupId: z.string().optional(),
+});
+
+export const CreateTaskGroupSchema = z.object({
+  mainTask: z.object({
+    title: z.string().min(1, "Main task title cannot be empty"),
+    description: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+  }),
+  subtasks: z.array(z.object({
+    title: z.string().min(1, "Subtask title cannot be empty"),
+    description: z.string().optional(),
+    dependencies: z.array(z.number()).optional(),
+    executionConfig: z.object({
+      toolsRequired: z.array(z.string()).optional(),
+      params: z.record(z.any()).optional(),
+      retryOnFailure: z.boolean().optional(),
+    }).optional(),
+  })),
+  groupId: z.string().optional(),
+});
+
+export const GetExecutableTasksSchema = z.object({
+  groupId: z.string().optional(),
+  limit: z.number().min(1, "Limit must be at least 1").optional(),
+});
+
+export const UpdateExecutionStatusSchema = z.object({
+  todoId: z.string().min(1, "Todo ID cannot be empty"),
+  state: z.enum(['pending', 'ready', 'running', 'completed', 'failed']),
+  error: z.string().optional(),
 });
