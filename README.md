@@ -35,6 +35,8 @@ Or add it to your MCP client configuration. The server provides these tools:
 - `createTaskGroup` - Create coordinated task groups with dependencies for complex workflows
 - `getExecutableTasks` - Find tasks ready for execution based on dependency satisfaction
 - `updateExecutionStatus` - Manage execution states with validation and auto-completion
+- `getTaskGroupStatus` - Get execution status summary for task groups
+- `resetTaskExecution` - Reset failed tasks with optional dependent task reset
 
 ## Agentic AI Capabilities
 
@@ -280,7 +282,38 @@ Zod schemas for request validation:
 
 Purpose-built for LLM task planning and execution with dependency management and state tracking. Tasks can be organized into groups with dependencies, automatically execute in the correct order, and retry on failure. Main tasks complete automatically when all subtasks finish.
 
+## Troubleshooting
+
+### Common Issues
+
+**Tasks stuck in "pending" state:**
+- Check if dependencies are satisfied using `getExecutableTasks`
+- Verify dependency IDs exist and are valid
+- Look for circular dependencies in task chains
+
+**Execution status updates failing:**
+- Ensure valid state transitions: pending → ready → running → completed/failed
+- Use "pending" state to retry failed tasks
+- Check for concurrent status updates on the same task
+
+**Main task not auto-completing:**
+- Verify all subtasks have `executionStatus.state: "completed"`
+- Check that subtasks share the same `groupId` as main task
+- Ensure main task has `executionOrder: 0`
+
+**Memory usage with large task groups:**
+- Use `limit` parameter in `getExecutableTasks` for batch processing
+- Consider breaking very large groups (1000+ tasks) into smaller groups
+- Monitor dependency graph complexity to avoid performance issues
+
 ## Changelog
+
+### v0.4.0 - Enhanced Agentic Tools
+- **New**: `getTaskGroupStatus` tool - Get execution status summary for task groups
+- **New**: `resetTaskExecution` tool - Reset failed tasks with optional dependent reset
+- **Enhanced**: ExecutionStateManager with group statistics and reset capabilities
+- **Added**: More execution monitoring and recovery tools
+- **Improved**: Better error handling and state transition validation
 
 ### v0.3.0 - Full Agentic AI Capabilities
 - **New**: Agentic AI system with dependency management and execution tracking

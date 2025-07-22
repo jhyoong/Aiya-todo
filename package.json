@@ -1,6 +1,6 @@
 {
   "name": "aiya-todo-mcp",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "MCP server for managing TODO tasks",
   "type": "module",
   "main": "./build/lib/index.js",

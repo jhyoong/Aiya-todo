@@ -104,3 +104,12 @@ export const UpdateExecutionStatusSchema = z.object({
   state: z.enum(['pending', 'ready', 'running', 'completed', 'failed']),
   error: z.string().optional(),
 });
+
+export const GetTaskGroupStatusSchema = z.object({
+  groupId: z.string().min(1, "Group ID cannot be empty"),
+});
+
+export const ResetTaskExecutionSchema = z.object({
+  todoId: z.string().min(1, "Todo ID cannot be empty"),
+  resetDependents: z.boolean().optional(),
+});
