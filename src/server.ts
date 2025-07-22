@@ -22,8 +22,10 @@ import {
   CreateTaskGroupSchema,
   GetExecutableTasksSchema,
   UpdateExecutionStatusSchema,
+  GetTaskGroupStatusSchema,
+  ResetTaskExecutionSchema,
 } from "./lib/schemas.js";
-import { UpdateTodoRequest, ListTodosRequest, SetVerificationMethodRequest, UpdateVerificationStatusRequest, GetTodosNeedingVerificationRequest, CreateTaskGroupRequest, GetExecutableTasksRequest, UpdateExecutionStatusRequest } from "./types.js";
+import { UpdateTodoRequest, ListTodosRequest, SetVerificationMethodRequest, UpdateVerificationStatusRequest, GetTodosNeedingVerificationRequest, CreateTaskGroupRequest, GetExecutableTasksRequest, UpdateExecutionStatusRequest, GetTaskGroupStatusRequest, ResetTaskExecutionRequest } from "./types.js";
 
 const todoManager = new TodoManager();
 const executionStateManager = new ExecutionStateManager();
@@ -32,7 +34,7 @@ const executionStateManager = new ExecutionStateManager();
 const server = new Server(
   {
     name: "aiya-todo-mcp",
-    version: "0.3.0",
+    version: "0.4.0",
   },
   {
     capabilities: {
@@ -289,6 +291,40 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             error: { type: "string" }
           },
           required: ["todoId", "state"]
+        }
+      },
+      {
+        name: "getTaskGroupStatus",
+        description: "Get execution status summary for a task group",
+        inputSchema: {
+          type: "object",
+          properties: {
+            groupId: {
+              type: "string",
+              description: "The group ID to get status for",
+              minLength: 1
+            }
+          },
+          required: ["groupId"]
+        }
+      },
+      {
+        name: "resetTaskExecution",
+        description: "Reset execution state for failed tasks",
+        inputSchema: {
+          type: "object",
+          properties: {
+            todoId: {
+              type: "string",
+              description: "The ID of the failed todo to reset",
+              minLength: 1
+            },
+            resetDependents: {
+              type: "boolean",
+              description: "Whether to also reset dependent tasks (optional)"
+            }
+          },
+          required: ["todoId"]
         }
       },
     ],
@@ -574,6 +610,84 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: "text",
               text: responseText,
+            },
+          ],
+        };
+      }
+
+      case "getTaskGroupStatus": {
+        const validatedArgs = GetTaskGroupStatusSchema.parse(args);
+        const request = validatedArgs as GetTaskGroupStatusRequest;
+        
+        const allTodos = todoManager.getAllTodos();
+        const groupTasks = allTodos.filter(todo => todo.groupId === request.groupId);
+        
+        if (groupTasks.length === 0) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `No tasks found for group ID: ${request.groupId}`,
+              },
+            ],
+          };
+        }
+        
+        // Find main task (executionOrder = 0)
+        const mainTask = groupTasks.find(todo => todo.executionOrder === 0) || null;
+        
+        // Get execution stats using ExecutionStateManager
+        const stats = executionStateManager.getGroupExecutionStats(
+          request.groupId,
+          () => todoManager.getAllTodos()
+        );
+        
+        // Sort tasks by executionOrder for consistent results
+        const sortedTasks = [...groupTasks].sort((a, b) => (a.executionOrder || 0) - (b.executionOrder || 0));
+        
+        const tasksList = sortedTasks.map(todo => {
+          const state = todo.executionStatus?.state || 'pending';
+          const isCompleted = todo.completed ? ' (completed)' : '';
+          return `[${todo.executionOrder || 0}] ${todo.id}: ${todo.title} - ${state}${isCompleted}`;
+        }).join('\n  ');
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Task Group Status: ${request.groupId}\n\nMain Task: ${mainTask ? `${mainTask.title} (${mainTask.executionStatus?.state || 'pending'})` : 'None'}\n\nStatistics:\n  Total: ${stats.total}\n  Pending: ${stats.pending}\n  Ready: ${stats.ready}\n  Running: ${stats.running}\n  Completed: ${stats.completed}\n  Failed: ${stats.failed}\n\nTasks:\n  ${tasksList}`,
+            },
+          ],
+        };
+      }
+
+      case "resetTaskExecution": {
+        const validatedArgs = ResetTaskExecutionSchema.parse(args);
+        const request = validatedArgs as ResetTaskExecutionRequest;
+        
+        const resetDependents = request.resetDependents || false;
+        
+        const result = await executionStateManager.resetFailedTask(
+          request.todoId,
+          resetDependents,
+          () => todoManager.getAllTodos(),
+          async (todoId, updates) => {
+            return await todoManager.updateTodo({
+              id: todoId,
+              ...updates,
+            });
+          }
+        );
+        
+        const resetTasksList = result.resetTasks.map(todo => 
+          `${todo.id}: ${todo.title} - reset to pending`
+        ).join('\n  ');
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Task execution reset successfully!\n\nReset Tasks (${result.resetTasks.length}):\n  ${resetTasksList}`,
             },
           ],
         };

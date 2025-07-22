@@ -125,6 +125,33 @@ export interface UpdateExecutionStatusRequest {
   error?: string;
 }
 
+export interface GetTaskGroupStatusRequest {
+  groupId: string;
+}
+
+export interface GetTaskGroupStatusResponse {
+  groupId: string;
+  mainTask: Todo | null;
+  stats: {
+    total: number;
+    pending: number;
+    ready: number;
+    running: number;
+    completed: number;
+    failed: number;
+  };
+  tasks: Todo[];
+}
+
+export interface ResetTaskExecutionRequest {
+  todoId: string;
+  resetDependents?: boolean;
+}
+
+export interface ResetTaskExecutionResponse {
+  resetTasks: Todo[];
+}
+
 export interface TodoStore {
   todos: Map<string, Todo>;
   nextId: number;
